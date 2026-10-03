@@ -5,8 +5,9 @@ import Foundation
 private let usage = """
 Usage: ChromePatcher --minimum-macos VERSION
 
-Compare this Mac's macOS version with the minimum required by a Chrome build.
+Detect Google Chrome and compare this Mac's macOS version with a Chrome build's minimum.
 VERSION must be numeric, for example 12.0 or 10.15.7.
+Chrome is searched for in /Applications and ~/Applications.
 This checker is read-only; it does not modify macOS or Chrome.
 """
 
@@ -36,7 +37,23 @@ let installedVersion = MacOSVersion(
     patch: systemVersion.patchVersion
 )
 
+let chromeInstallation: ChromeInstallation?
+do {
+    chromeInstallation = try ChromeDetector.detect(
+        in: ChromeDetector.defaultApplicationDirectories
+    )
+} catch {
+    fputs("Could not inspect Google Chrome: \(error.localizedDescription)\n", stderr)
+    exit(2)
+}
+
 print("Detected: \(installedVersion.displayName)")
+if let chromeInstallation {
+    print("Google Chrome: version \(chromeInstallation.version)")
+    print("Location: \(chromeInstallation.appURL.path)")
+} else {
+    print("Google Chrome: not found in /Applications or ~/Applications")
+}
 print("Chrome build minimum: macOS \(minimumVersion)")
 print("Mode: read-only; no changes made.")
 
