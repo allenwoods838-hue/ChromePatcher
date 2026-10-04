@@ -55,6 +55,26 @@ public struct ChromeBuildProfiles {
             .appendingPathComponent("Library/Application Support/ChromePatcher/profiles.json")
     }
 
+    public static func templateJSON(
+        profileName: String = "my-chrome-build",
+        minimumMacOS: String = "12.0",
+        description: String? = "Example profile; verify this minimum for the exact build."
+    ) -> String {
+        let normalizedName = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let safeName = normalizedName.isEmpty ? "my-chrome-build" : normalizedName
+        let encodedFile = ChromeBuildProfileFile(profiles: [
+            safeName: ChromeBuildProfile(
+                minimumMacOS: minimumMacOS,
+                description: description
+            )
+        ])
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try! encoder.encode(encodedFile)
+        return String(data: data, encoding: .utf8) ?? "{}"
+    }
+
     public static func load(from fileURL: URL) throws -> ChromeBuildProfiles {
         let data: Data
         do {

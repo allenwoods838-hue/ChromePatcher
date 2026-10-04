@@ -7,11 +7,15 @@ Usage:
   ChromePatcher --minimum-macos VERSION [--json]
   ChromePatcher --profile NAME [--profiles-file PATH] [--json]
   ChromePatcher --list-profiles [--profiles-file PATH]
+  ChromePatcher --profile-template [NAME]
+  ChromePatcher --validate-profiles-file PATH
 
 Detect Google Chrome and compare this Mac's macOS version with a Chrome build's minimum.
 VERSION must be numeric, for example 12.0 or 10.15.7.
 Use --profile NAME to check a named local build profile.
 Use --list-profiles to list configured profile names.
+Use --profile-template NAME to print a JSON template for a new profile.
+Use --validate-profiles-file PATH to validate a profiles JSON file.
 Use --profiles-file PATH to select a profiles JSON file.
 Add --json to emit a machine-readable JSON report.
 Chrome is searched for in /Applications and ~/Applications.
@@ -80,6 +84,32 @@ case "--list-profiles":
                 print("\(name): macOS \(profile.minimumMacOS)\(description)")
             }
         }
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(2)
+    }
+    exit(0)
+case "--profile-template":
+    guard commandArguments.count <= 2, jsonArguments.isEmpty else {
+        fputs("\(usage)\n", stderr)
+        exit(2)
+    }
+    let profileName = commandArguments.count == 2 ? commandArguments[1] : "my-chrome-build"
+    guard !profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        fputs("Profile names must not be empty.\n\(usage)\n", stderr)
+        exit(2)
+    }
+    print(ChromeBuildProfiles.templateJSON(profileName: profileName))
+    exit(0)
+case "--validate-profiles-file":
+    guard commandArguments.count == 2, jsonArguments.isEmpty else {
+        fputs("\(usage)\n", stderr)
+        exit(2)
+    }
+    let profileURL = URL(fileURLWithPath: commandArguments[1])
+    do {
+        _ = try ChromeBuildProfiles.load(from: profileURL)
+        print("Valid Chrome build profiles file: \(profileURL.path)")
     } catch {
         fputs("\(error.localizedDescription)\n", stderr)
         exit(2)

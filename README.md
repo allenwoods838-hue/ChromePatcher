@@ -51,6 +51,18 @@ swift run ChromePatcher --profile my-chrome-build
 swift run ChromePatcher --profile my-chrome-build --json
 ```
 
+To generate a JSON profile template without guessing the schema, print one from the CLI:
+
+```sh
+swift run ChromePatcher --profile-template my-chrome-build
+```
+
+To validate an existing profile file before using it:
+
+```sh
+swift run ChromePatcher --validate-profiles-file ~/Library/Application\ Support/ChromePatcher/profiles.json
+```
+
 Pass `--profiles-file PATH` with `--profile` or `--list-profiles` to use another
 configuration file. The original `--minimum-macos VERSION` command remains
 available for one-off checks.
