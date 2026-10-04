@@ -3,13 +3,20 @@ import Darwin
 import Foundation
 
 private let usage = """
-Usage: ChromePatcher --minimum-macos VERSION
+Usage:
+  ChromePatcher --minimum-macos VERSION [--json]
+  ChromePatcher --profile NAME [--profiles-file PATH] [--json]
+  ChromePatcher --list-profiles [--profiles-file PATH]
 
 Detect Google Chrome and compare this Mac's macOS version with a Chrome build's minimum.
 VERSION must be numeric, for example 12.0 or 10.15.7.
+Use --profile NAME to check a named local build profile.
+Use --list-profiles to list configured profile names.
+Use --profiles-file PATH to select a profiles JSON file.
 Add --json to emit a machine-readable JSON report.
 Chrome is searched for in /Applications and ~/Applications.
 The Chrome executable's CPU architectures are checked against this Mac.
+Default profiles file: ~/Library/Application Support/ChromePatcher/profiles.json
 This checker is read-only; it does not modify macOS or Chrome.
 """
 
@@ -21,19 +28,69 @@ if arguments == ["--help"] || arguments == ["-h"] {
 }
 
 let jsonArguments = arguments.filter { $0 == "--json" }
-let commandArguments = arguments.filter { $0 != "--json" }
-guard jsonArguments.count <= 1,
-      commandArguments.count == 2,
-      commandArguments[0] == "--minimum-macos" else {
+var commandArguments = arguments.filter { $0 != "--json" }
+guard jsonArguments.count <= 1 else {
     fputs("\(usage)\n", stderr)
     exit(2)
 }
 
-guard let minimumVersion = MacOSVersion(commandArguments[1]) else {
-    fputs("Invalid minimum macOS version: \(commandArguments[1])\n", stderr)
+var profilesFileURL: URL?
+if let profilesFileIndex = commandArguments.firstIndex(of: "--profiles-file") {
+    guard profilesFileIndex + 1 < commandArguments.count else {
+        fputs("\(usage)\n", stderr)
+        exit(2)
+    }
+    profilesFileURL = URL(fileURLWithPath: commandArguments[profilesFileIndex + 1])
+    commandArguments.removeSubrange(profilesFileIndex...(profilesFileIndex + 1))
+}
+
+let minimumVersion: MacOSVersion
+switch commandArguments.first {
+case "--minimum-macos":
+    guard commandArguments.count == 2, profilesFileURL == nil,
+          let version = MacOSVersion(commandArguments[1]) else {
+        fputs("Invalid minimum macOS version or command options.\n\(usage)\n", stderr)
+        exit(2)
+    }
+    minimumVersion = version
+case "--profile":
+    guard commandArguments.count == 2 else {
+        fputs("\(usage)\n", stderr)
+        exit(2)
+    }
+    let profileURL = profilesFileURL ?? ChromeBuildProfiles.defaultFileURL
+    do {
+        minimumVersion = try ChromeBuildProfiles.load(from: profileURL)
+            .minimumMacOSVersion(for: commandArguments[1])
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(2)
+    }
+case "--list-profiles":
+    guard commandArguments.count == 1, jsonArguments.isEmpty else {
+        fputs("\(usage)\n", stderr)
+        exit(2)
+    }
+    let profileURL = profilesFileURL ?? ChromeBuildProfiles.defaultFileURL
+    do {
+        let profiles = try ChromeBuildProfiles.load(from: profileURL)
+        for name in profiles.names {
+            if let profile = profiles.profile(named: name) {
+                let description = profile.description.map { " - \($0)" } ?? ""
+                print("\(name): macOS \(profile.minimumMacOS)\(description)")
+            }
+        }
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(2)
+    }
+    exit(0)
+default:
     fputs("\(usage)\n", stderr)
     exit(2)
 }
+
+let selectedProfileName = commandArguments.first == "--profile" ? commandArguments[1] : nil
 
 #if os(macOS)
 let systemVersion = ProcessInfo.processInfo.operatingSystemVersion
@@ -70,7 +127,8 @@ let report = CompatibilityReport(
     minimumMacOS: minimumVersion,
     modelIdentifier: modelIdentifier,
     hostArchitecture: hostArchitecture,
-    chromeInstallation: chromeInstallation
+    chromeInstallation: chromeInstallation,
+    profileName: selectedProfileName
 )
 let readiness = CompatibilityReadiness(
     installedMacOS: installedVersion,
@@ -110,6 +168,9 @@ if !jsonArguments.isEmpty {
         print("Google Chrome: not found in /Applications or ~/Applications")
     }
     print("Chrome build minimum: macOS \(minimumVersion)")
+    if let selectedProfileName {
+        print("Chrome build profile: \(selectedProfileName)")
+    }
     print("Mode: read-only; no changes made.")
     print("Overall result: \(readiness.summary)")
 }

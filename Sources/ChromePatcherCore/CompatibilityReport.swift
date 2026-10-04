@@ -12,6 +12,7 @@ public struct CompatibilityReport: Codable, Equatable {
     public let chromePath: String?
     public let chromeArchitectures: [String]?
     public let nativeArchitectureAvailable: Bool?
+    public let profileName: String?
     public let readiness: String
     public let readinessSummary: String
     public let readOnly: Bool
@@ -28,6 +29,7 @@ public struct CompatibilityReport: Codable, Equatable {
         case chromePath
         case chromeArchitectures
         case nativeArchitectureAvailable
+        case profileName
         case readiness
         case readinessSummary
         case readOnly
@@ -38,7 +40,8 @@ public struct CompatibilityReport: Codable, Equatable {
         minimumMacOS: MacOSVersion,
         modelIdentifier: String,
         hostArchitecture: BinaryArchitecture,
-        chromeInstallation: ChromeInstallation?
+        chromeInstallation: ChromeInstallation?,
+        profileName: String? = nil
     ) {
         let readiness = CompatibilityReadiness(
             installedMacOS: installedMacOS,
@@ -62,6 +65,7 @@ public struct CompatibilityReport: Codable, Equatable {
         nativeArchitectureAvailable = chromeInstallation.map {
             $0.architectures.contains(hostArchitecture)
         }
+        self.profileName = profileName
         self.readiness = readiness.identifier
         readinessSummary = readiness.summary
         readOnly = true
@@ -80,6 +84,7 @@ public struct CompatibilityReport: Codable, Equatable {
         try container.encode(chromePath, forKey: .chromePath)
         try container.encode(chromeArchitectures, forKey: .chromeArchitectures)
         try container.encode(nativeArchitectureAvailable, forKey: .nativeArchitectureAvailable)
+        try container.encode(profileName, forKey: .profileName)
         try container.encode(readiness, forKey: .readiness)
         try container.encode(readinessSummary, forKey: .readinessSummary)
         try container.encode(readOnly, forKey: .readOnly)
