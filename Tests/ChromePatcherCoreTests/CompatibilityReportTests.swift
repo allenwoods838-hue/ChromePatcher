@@ -14,7 +14,8 @@ final class CompatibilityReportTests: XCTestCase {
             minimumMacOS: MacOSVersion(major: 12, minor: 0),
             modelIdentifier: "Mac14,7",
             hostArchitecture: .arm64,
-            chromeInstallation: chrome
+            chromeInstallation: chrome,
+            profileName: "chrome-126"
         )
 
         let data = try JSONEncoder().encode(report)
@@ -31,6 +32,7 @@ final class CompatibilityReportTests: XCTestCase {
         XCTAssertEqual(decoded.chromePath, "/Applications/Google Chrome.app")
         XCTAssertEqual(decoded.chromeArchitectures, ["arm64", "x86_64"])
         XCTAssertEqual(decoded.nativeArchitectureAvailable, true)
+        XCTAssertEqual(decoded.profileName, "chrome-126")
         XCTAssertEqual(decoded.readiness, "ready")
         XCTAssertTrue(decoded.readOnly)
     }

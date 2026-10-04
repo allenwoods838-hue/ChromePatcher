@@ -22,6 +22,39 @@ Build and run on macOS with Swift:
 swift run ChromePatcher --minimum-macos 12.0
 ```
 
+### Named Chrome build profiles
+
+For repeat checks, create a JSON file at
+`~/Library/Application Support/ChromePatcher/profiles.json`:
+
+```json
+{
+  "profiles": {
+    "chrome-126": {
+      "minimumMacOS": "10.15",
+      "description": "Example profile; verify this minimum for the exact build."
+    },
+    "my-chrome-build": {
+      "minimumMacOS": "12.0"
+    }
+  }
+}
+```
+
+Profile requirements are local configuration, not automatically verified
+against Google. Confirm the minimum for the exact Chrome build before adding a
+profile. Then list and use profiles by name:
+
+```sh
+swift run ChromePatcher --list-profiles
+swift run ChromePatcher --profile my-chrome-build
+swift run ChromePatcher --profile my-chrome-build --json
+```
+
+Pass `--profiles-file PATH` with `--profile` or `--list-profiles` to use another
+configuration file. The original `--minimum-macos VERSION` command remains
+available for one-off checks.
+
 For scripts, add `--json` to emit a JSON report instead:
 
 ```sh
@@ -36,7 +69,8 @@ exit status reflects the macOS minimum check only; architecture availability
 and the overall readiness summary are reported separately. If Chrome is not
 installed, the tool reports that readiness cannot be assessed. Use `--help`
 for command help. JSON output is written alone to standard output; diagnostics
-and errors go to standard error. Its schema is versioned with `schemaVersion`.
+and errors go to standard error. Its schema is versioned with `schemaVersion`;
+`profileName` identifies the selected profile when using `--profile`.
 
 This tool is diagnostic only. It does not download, install, modify, or launch
 Chrome, and it does not change system files. The Chrome version is reported for
