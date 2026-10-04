@@ -216,6 +216,72 @@ final class ChromeBuildProfilesTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: destinationURL), originalData)
     }
 
+    func testExportCanSelectSpecificProfiles() throws {
+        let sourceURL = try writeProfiles([
+            "first": ChromeBuildProfile(minimumMacOS: "10.15"),
+            "second": ChromeBuildProfile(minimumMacOS: "12.0"),
+            "third": ChromeBuildProfile(minimumMacOS: "13.0")
+        ])
+        let exportURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        defer {
+            try? FileManager.default.removeItem(at: sourceURL)
+            try? FileManager.default.removeItem(at: exportURL)
+        }
+
+        try ChromeBuildProfiles.load(from: sourceURL).export(
+            to: exportURL,
+            profileNames: ["third", "first"]
+        )
+
+        XCTAssertEqual(try ChromeBuildProfiles.load(from: exportURL).names, ["first", "third"])
+    }
+
+    func testImportCanSelectProfilesAndIgnoreUnselectedConflicts() throws {
+        let sourceURL = try writeProfiles([
+            "selected": ChromeBuildProfile(minimumMacOS: "10.15"),
+            "conflict": ChromeBuildProfile(minimumMacOS: "13.0")
+        ])
+        let destinationURL = try writeProfiles([
+            "conflict": ChromeBuildProfile(minimumMacOS: "12.0")
+        ])
+        defer {
+            try? FileManager.default.removeItem(at: sourceURL)
+            try? FileManager.default.removeItem(at: destinationURL)
+        }
+
+        try ChromeBuildProfiles.load(from: destinationURL).importProfiles(
+            from: ChromeBuildProfiles.load(from: sourceURL),
+            profileNames: ["selected"]
+        )
+
+        let imported = try ChromeBuildProfiles.load(from: destinationURL)
+        XCTAssertEqual(imported.names, ["conflict", "selected"])
+        XCTAssertEqual(imported.profile(named: "conflict")?.minimumMacOS, "12.0")
+    }
+
+    func testSelectingMissingProfileFailsWithoutModifyingDestination() throws {
+        let sourceURL = try writeProfiles([
+            "available": ChromeBuildProfile(minimumMacOS: "12.0")
+        ])
+        let destinationURL = try writeProfiles([
+            "existing": ChromeBuildProfile(minimumMacOS: "13.0")
+        ])
+        defer {
+            try? FileManager.default.removeItem(at: sourceURL)
+            try? FileManager.default.removeItem(at: destinationURL)
+        }
+        let originalData = try Data(contentsOf: destinationURL)
+
+        XCTAssertThrowsError(
+            try ChromeBuildProfiles.load(from: destinationURL).importProfiles(
+                from: ChromeBuildProfiles.load(from: sourceURL),
+                profileNames: ["missing"]
+            )
+        )
+        XCTAssertEqual(try Data(contentsOf: destinationURL), originalData)
+    }
+
     private func writeProfiles(_ profiles: [String: ChromeBuildProfile]) throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
