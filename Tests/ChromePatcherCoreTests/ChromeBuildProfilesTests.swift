@@ -47,7 +47,7 @@ final class ChromeBuildProfilesTests: XCTestCase {
     }
 
     func testGeneratesProfileTemplateJSON() throws {
-        let json = ChromeBuildProfiles.templateJSON(
+        let json = try ChromeBuildProfiles.templateJSON(
             profileName: "chrome-126",
             minimumMacOS: "10.15.7",
             description: "Example profile"
@@ -73,6 +73,47 @@ final class ChromeBuildProfilesTests: XCTestCase {
 
         XCTAssertEqual(profiles.names, ["chrome-126"])
         XCTAssertEqual(try profiles.minimumMacOSVersion(for: "chrome-126"), MacOSVersion(major: 12, minor: 0))
+    }
+
+    func testAddsUpdatesAndRemovesProfilesWithoutLosingOthers() throws {
+        let url = try writeProfiles([
+            "existing": ChromeBuildProfile(minimumMacOS: "11.0", description: "Keep me")
+        ])
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        try ChromeBuildProfiles.load(from: url).addProfile(
+            named: "new-build",
+            profile: ChromeBuildProfile(minimumMacOS: "12.0", description: "New profile")
+        )
+        try ChromeBuildProfiles.load(from: url).updateProfile(
+            named: "new-build",
+            minimumMacOS: "13.0"
+        )
+
+        let afterUpdate = try ChromeBuildProfiles.load(from: url)
+        XCTAssertEqual(afterUpdate.names, ["existing", "new-build"])
+        XCTAssertEqual(afterUpdate.profile(named: "existing")?.description, "Keep me")
+        XCTAssertEqual(afterUpdate.profile(named: "new-build")?.minimumMacOS, "13.0")
+        XCTAssertEqual(afterUpdate.profile(named: "new-build")?.description, "New profile")
+
+        try afterUpdate.removeProfile(named: "new-build")
+        XCTAssertEqual(try ChromeBuildProfiles.load(from: url).names, ["existing"])
+    }
+
+    func testAddingExistingProfileFailsWithoutChangingFile() throws {
+        let url = try writeProfiles([
+            "existing": ChromeBuildProfile(minimumMacOS: "11.0")
+        ])
+        defer { try? FileManager.default.removeItem(at: url) }
+        let originalData = try Data(contentsOf: url)
+
+        XCTAssertThrowsError(
+            try ChromeBuildProfiles.load(from: url).addProfile(
+                named: "existing",
+                profile: ChromeBuildProfile(minimumMacOS: "12.0")
+            )
+        )
+        XCTAssertEqual(try Data(contentsOf: url), originalData)
     }
 
     private func writeProfiles(_ profiles: [String: ChromeBuildProfile]) throws -> URL {
