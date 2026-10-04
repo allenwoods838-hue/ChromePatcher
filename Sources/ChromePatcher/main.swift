@@ -12,8 +12,8 @@ Usage:
   ChromePatcher --profile-template [NAME]
   ChromePatcher --validate-profiles-file PATH
   ChromePatcher --init-profiles-file [PATH]
-  ChromePatcher --export-profiles-file PATH [--profiles-file PATH]
-  ChromePatcher --import-profiles-file PATH [--profiles-file PATH]
+  ChromePatcher --export-profiles-file PATH [PROFILE ...] [--profiles-file PATH]
+  ChromePatcher --import-profiles-file PATH [PROFILE ...] [--profiles-file PATH]
   ChromePatcher --add-profile NAME --minimum-macos VERSION [--description TEXT] [--profiles-file PATH]
   ChromePatcher --update-profile NAME --minimum-macos VERSION [--description TEXT] [--profiles-file PATH]
   ChromePatcher --remove-profile NAME [--profiles-file PATH]
@@ -27,8 +27,8 @@ Use --compare-profiles NAME1 NAME2 to compare profile requirements.
 Use --profile-template NAME to print a JSON template for a new profile.
 Use --validate-profiles-file PATH to validate a profiles JSON file.
 Use --init-profiles-file PATH to create a starter profiles file in the standard location.
-Use --export-profiles-file PATH to export the selected profiles file without overwriting a destination.
-Use --import-profiles-file PATH to merge profiles from another file; conflicts are rejected.
+Use --export-profiles-file PATH [PROFILE ...] to export all or selected profiles without overwriting a destination.
+Use --import-profiles-file PATH [PROFILE ...] to merge all or selected profiles; conflicts are rejected.
 Use --add-profile, --update-profile, and --remove-profile to manage named profiles.
 Use --profiles-file PATH to select a profiles JSON file.
 Add --json to emit a machine-readable JSON report.
@@ -271,14 +271,19 @@ case "--validate-profiles-file":
     }
     exit(0)
 case "--export-profiles-file":
-    guard commandArguments.count == 2, jsonArguments.isEmpty else {
+    guard commandArguments.count >= 2, jsonArguments.isEmpty else {
         fputs("\(usage)\n", stderr)
         exit(2)
     }
     let sourceURL = profilesFileURL ?? ChromeBuildProfiles.defaultFileURL
     let destinationURL = URL(fileURLWithPath: commandArguments[1])
+    let requestedNames = Array(commandArguments.dropFirst(2))
+    let profileNames = requestedNames.isEmpty ? nil : requestedNames
     do {
-        try ChromeBuildProfiles.load(from: sourceURL).export(to: destinationURL)
+        try ChromeBuildProfiles.load(from: sourceURL).export(
+            to: destinationURL,
+            profileNames: profileNames
+        )
         print("Exported Chrome build profiles to \(destinationURL.path)")
     } catch {
         fputs("\(error.localizedDescription)\n", stderr)
@@ -286,15 +291,20 @@ case "--export-profiles-file":
     }
     exit(0)
 case "--import-profiles-file":
-    guard commandArguments.count == 2, jsonArguments.isEmpty else {
+    guard commandArguments.count >= 2, jsonArguments.isEmpty else {
         fputs("\(usage)\n", stderr)
         exit(2)
     }
     let sourceURL = URL(fileURLWithPath: commandArguments[1])
     let destinationURL = profilesFileURL ?? ChromeBuildProfiles.defaultFileURL
+    let requestedNames = Array(commandArguments.dropFirst(2))
+    let profileNames = requestedNames.isEmpty ? nil : requestedNames
     do {
         let source = try ChromeBuildProfiles.load(from: sourceURL)
-        try ChromeBuildProfiles.load(from: destinationURL).importProfiles(from: source)
+        try ChromeBuildProfiles.load(from: destinationURL).importProfiles(
+            from: source,
+            profileNames: profileNames
+        )
         print("Imported Chrome build profiles from \(sourceURL.path)")
     } catch {
         fputs("\(error.localizedDescription)\n", stderr)

@@ -93,20 +93,24 @@ Use `--profiles-file PATH` with these commands to manage a custom profiles
 file. Updates are written atomically so a failed write does not leave a partial
 JSON file.
 
-Back up or move profile collections with import and export. Export reads from
-the default profile file (or the selected `--profiles-file`) and will not
-overwrite an existing destination. Import merges into the default profile file
-(or the selected destination file); if any profile name already exists, the
-import fails without changing the destination:
+Back up or move all profiles, or select only the profiles you need. Export
+reads from the default profile file (or the selected `--profiles-file`) and
+will not overwrite an existing destination. Import merges into the default
+profile file (or the selected destination file); selected name conflicts fail
+without changing the destination:
 
 ```sh
 swift run ChromePatcher --export-profiles-file ~/Desktop/chrome-profiles-backup.json
+swift run ChromePatcher --export-profiles-file ~/Desktop/chrome-beta.json chrome-beta
 swift run ChromePatcher --import-profiles-file ~/Desktop/chrome-profiles-backup.json
+swift run ChromePatcher --import-profiles-file ~/Desktop/chrome-beta.json chrome-beta
 ```
 
 For custom files, `--profiles-file PATH` selects the export source or import
-destination. Validate an exported or received file before using it with
-`--validate-profiles-file PATH`.
+destination. List one or more profile names after the path to select them;
+omit names to export or import every profile. A requested profile that does
+not exist causes an error. Validate an exported or received file before using
+it with `--validate-profiles-file PATH`.
 
 Pass `--profiles-file PATH` with `--profile` or `--list-profiles` to use another
 configuration file. The original `--minimum-macos VERSION` command remains

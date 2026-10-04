@@ -228,13 +228,14 @@ public struct ChromeBuildProfiles {
         try write(ChromeBuildProfileFile(profiles: updatedProfiles))
     }
 
-    public func export(to destinationURL: URL) throws {
+    public func export(to destinationURL: URL, profileNames: [String]? = nil) throws {
         let directoryURL = destinationURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(
             at: directoryURL,
             withIntermediateDirectories: true
         )
-        let data = try encodedFile()
+        let exportFile = try selectedFile(named: profileNames)
+        let data = try encodedFile(exportFile)
         let temporaryURL = directoryURL.appendingPathComponent(".\(UUID().uuidString).profiles")
         try data.write(to: temporaryURL, options: .atomic)
         do {
@@ -248,18 +249,30 @@ public struct ChromeBuildProfiles {
         }
     }
 
-    public func importProfiles(from source: ChromeBuildProfiles) throws {
-        for name in source.names where file.profiles[name] != nil {
+    public func importProfiles(from source: ChromeBuildProfiles, profileNames: [String]? = nil) throws {
+        let sourceFile = try source.selectedFile(named: profileNames)
+        for name in sourceFile.profiles.keys where file.profiles[name] != nil {
             throw ChromeBuildProfileError.profileAlreadyExists(name, fileURL)
         }
 
         var updatedProfiles = file.profiles
-        for name in source.names {
-            if let profile = source.profile(named: name) {
-                updatedProfiles[name] = profile
-            }
-        }
+        updatedProfiles.merge(sourceFile.profiles) { _, incoming in incoming }
         try write(ChromeBuildProfileFile(profiles: updatedProfiles))
+    }
+
+    private func selectedFile(named profileNames: [String]?) throws -> ChromeBuildProfileFile {
+        guard let profileNames else {
+            return file
+        }
+
+        var selectedProfiles: [String: ChromeBuildProfile] = [:]
+        for name in profileNames {
+            guard let profile = file.profiles[name] else {
+                throw ChromeBuildProfileError.profileNotFound(name, fileURL)
+            }
+            selectedProfiles[name] = profile
+        }
+        return ChromeBuildProfileFile(profiles: selectedProfiles)
     }
 
     private func validate(name: String, profile: ChromeBuildProfile) throws {
