@@ -46,6 +46,23 @@ final class ChromeBuildProfilesTests: XCTestCase {
         XCTAssertThrowsError(try ChromeBuildProfiles.load(from: url).minimumMacOSVersion(for: "missing"))
     }
 
+    func testGeneratesProfileTemplateJSON() throws {
+        let json = ChromeBuildProfiles.templateJSON(
+            profileName: "chrome-126",
+            minimumMacOS: "10.15.7",
+            description: "Example profile"
+        )
+
+        guard let data = json.data(using: .utf8) else {
+            XCTFail("Template JSON should be UTF-8 encoded")
+            return
+        }
+
+        let decoded = try JSONDecoder().decode(ChromeBuildProfileFile.self, from: data)
+        XCTAssertEqual(decoded.profiles["chrome-126"]?.minimumMacOS, "10.15.7")
+        XCTAssertEqual(decoded.profiles["chrome-126"]?.description, "Example profile")
+    }
+
     private func writeProfiles(_ profiles: [String: ChromeBuildProfile]) throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
