@@ -20,6 +20,56 @@ final class BinaryArchitectureTests: XCTestCase {
         XCTAssertThrowsError(try read(bytes: [0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 2]))
     }
 
+    func testReadinessRequiresChromeAndBothCompatibilityChecks() {
+        let macOS = MacOSVersion(major: 12, minor: 0)
+
+        XCTAssertEqual(
+            CompatibilityReadiness(
+                installedMacOS: macOS,
+                minimumMacOS: macOS,
+                chromeArchitectures: nil,
+                hostArchitecture: .arm64
+            ),
+            .chromeNotInstalled
+        )
+        XCTAssertEqual(
+            CompatibilityReadiness(
+                installedMacOS: macOS,
+                minimumMacOS: macOS,
+                chromeArchitectures: [.arm64, .x86_64],
+                hostArchitecture: .arm64
+            ),
+            .ready
+        )
+        XCTAssertEqual(
+            CompatibilityReadiness(
+                installedMacOS: macOS,
+                minimumMacOS: macOS,
+                chromeArchitectures: [.x86_64],
+                hostArchitecture: .arm64
+            ),
+            .noNativeArchitecture
+        )
+        XCTAssertEqual(
+            CompatibilityReadiness(
+                installedMacOS: MacOSVersion(major: 11, minor: 7),
+                minimumMacOS: macOS,
+                chromeArchitectures: [.arm64],
+                hostArchitecture: .arm64
+            ),
+            .macOSBelowMinimum
+        )
+        XCTAssertEqual(
+            CompatibilityReadiness(
+                installedMacOS: MacOSVersion(major: 11, minor: 7),
+                minimumMacOS: macOS,
+                chromeArchitectures: [.x86_64],
+                hostArchitecture: .arm64
+            ),
+            .macOSBelowMinimumAndNoNativeArchitecture
+        )
+    }
+
     private func read(architecture: UInt32) throws -> Set<BinaryArchitecture> {
         var bytes: [UInt8] = [0xcf, 0xfa, 0xed, 0xfe]
         bytes += (0..<4).map { UInt8((architecture >> ($0 * 8)) & 0xff) }

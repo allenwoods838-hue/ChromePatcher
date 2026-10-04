@@ -7,13 +7,14 @@ versions.
 ## Read-only compatibility checker
 
 The command-line tool reports the installed macOS version and detects the
-Google Chrome app in `/Applications` or `~/Applications`, including its version
-location, and executable CPU architectures. It reports whether Chrome includes
-a native slice for the Mac's architecture; on Apple silicon, an x86_64-only
-Chrome build may also run through Rosetta if it is installed. It compares macOS
-with the minimum version you provide for a specific Chrome build. Chrome's
-minimum supported macOS version changes over time, so the tool deliberately
-does not guess or bundle a stale minimum.
+Google Chrome app in `/Applications` or `~/Applications`, including its
+version, location, and executable CPU architectures. It also reports the Mac
+model identifier and CPU architecture, then gives an overall readiness summary
+based on whether macOS meets the supplied minimum and Chrome includes a native
+slice for the Mac's architecture. On Apple silicon, an x86_64-only Chrome build
+may also run through Rosetta if it is installed. Chrome's minimum supported
+macOS version changes over time, so the tool deliberately does not guess or
+bundle a stale minimum.
 
 Build and run on macOS with Swift:
 
@@ -26,7 +27,9 @@ The checker searches the standard system and user Applications folders. It
 exits with status `0` when macOS meets the supplied minimum, `1` when it does
 not, and `2` for invalid usage or unreadable Chrome metadata/executable. The
 exit status reflects the macOS minimum check only; architecture availability
-is reported separately. Use `--help` for command help.
+and the overall readiness summary are reported separately. If Chrome is not
+installed, the tool reports that readiness cannot be assessed. Use `--help`
+for command help.
 
 This tool is diagnostic only. It does not download, install, modify, or launch
 Chrome, and it does not change system files. The Chrome version is reported for
