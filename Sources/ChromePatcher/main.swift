@@ -37,6 +37,13 @@ let installedVersion = MacOSVersion(
     minor: systemVersion.minorVersion,
     patch: systemVersion.patchVersion
 )
+let modelIdentifier: String
+do {
+    modelIdentifier = try MacHardware.modelIdentifier()
+} catch {
+    fputs("\(error.localizedDescription)\n", stderr)
+    exit(2)
+}
 
 let chromeInstallation: ChromeInstallation?
 do {
@@ -49,28 +56,36 @@ do {
 }
 
 print("Detected: \(installedVersion.displayName)")
+print("Mac model: \(modelIdentifier)")
+guard let hostArchitecture = BinaryArchitecture.host else {
+    fputs("Could not determine this Mac's CPU architecture.\n", stderr)
+    exit(2)
+}
+print("Mac architecture: \(hostArchitecture)")
 if let chromeInstallation {
     print("Google Chrome: version \(chromeInstallation.version)")
     print("Location: \(chromeInstallation.appURL.path)")
     print("Chrome architectures: \(chromeInstallation.architectures.map(\.description).sorted().joined(separator: ", "))")
-    if let hostArchitecture = BinaryArchitecture.host {
-        if chromeInstallation.architectures.contains(hostArchitecture) {
-            print("Architecture result: native \(hostArchitecture) support is available.")
-        } else {
-            print("Architecture result: no native \(hostArchitecture) slice is available.")
-            if hostArchitecture == .arm64, chromeInstallation.architectures.contains(.x86_64) {
-                print("An x86_64 build may run through Rosetta if Rosetta is installed.")
-            }
-        }
+    if chromeInstallation.architectures.contains(hostArchitecture) {
+        print("Architecture result: native support is available.")
     } else {
-        fputs("Could not determine this Mac's CPU architecture.\n", stderr)
-        exit(2)
+        print("Architecture result: no native slice is available.")
+        if hostArchitecture == .arm64, chromeInstallation.architectures.contains(.x86_64) {
+            print("An x86_64 build may run through Rosetta if Rosetta is installed.")
+        }
     }
 } else {
     print("Google Chrome: not found in /Applications or ~/Applications")
 }
 print("Chrome build minimum: macOS \(minimumVersion)")
 print("Mode: read-only; no changes made.")
+let readiness = CompatibilityReadiness(
+    installedMacOS: installedVersion,
+    minimumMacOS: minimumVersion,
+    chromeArchitectures: chromeInstallation?.architectures,
+    hostArchitecture: hostArchitecture
+)
+print("Overall result: \(readiness.summary)")
 
 switch CompatibilityResult(installed: installedVersion, minimum: minimumVersion) {
 case .atOrAboveMinimum:
