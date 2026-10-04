@@ -8,6 +8,7 @@ Usage: ChromePatcher --minimum-macos VERSION
 Detect Google Chrome and compare this Mac's macOS version with a Chrome build's minimum.
 VERSION must be numeric, for example 12.0 or 10.15.7.
 Chrome is searched for in /Applications and ~/Applications.
+The Chrome executable's CPU architectures are checked against this Mac.
 This checker is read-only; it does not modify macOS or Chrome.
 """
 
@@ -51,6 +52,20 @@ print("Detected: \(installedVersion.displayName)")
 if let chromeInstallation {
     print("Google Chrome: version \(chromeInstallation.version)")
     print("Location: \(chromeInstallation.appURL.path)")
+    print("Chrome architectures: \(chromeInstallation.architectures.map(\.description).sorted().joined(separator: ", "))")
+    if let hostArchitecture = BinaryArchitecture.host {
+        if chromeInstallation.architectures.contains(hostArchitecture) {
+            print("Architecture result: native \(hostArchitecture) support is available.")
+        } else {
+            print("Architecture result: no native \(hostArchitecture) slice is available.")
+            if hostArchitecture == .arm64, chromeInstallation.architectures.contains(.x86_64) {
+                print("An x86_64 build may run through Rosetta if Rosetta is installed.")
+            }
+        }
+    } else {
+        fputs("Could not determine this Mac's CPU architecture.\n", stderr)
+        exit(2)
+    }
 } else {
     print("Google Chrome: not found in /Applications or ~/Applications")
 }
@@ -59,10 +74,10 @@ print("Mode: read-only; no changes made.")
 
 switch CompatibilityResult(installed: installedVersion, minimum: minimumVersion) {
 case .atOrAboveMinimum:
-    print("Result: This Mac meets the specified minimum.")
+    print("Result: This Mac's macOS version meets the specified minimum.")
     exit(0)
 case .belowMinimum:
-    print("Result: This Mac is below the specified minimum.")
+    print("Result: This Mac's macOS version is below the specified minimum.")
     exit(1)
 }
 #else

@@ -3,10 +3,12 @@ import Foundation
 public struct ChromeInstallation: Equatable {
     public let version: String
     public let appURL: URL
+    public let architectures: Set<BinaryArchitecture>
 
-    public init(version: String, appURL: URL) {
+    public init(version: String, appURL: URL, architectures: Set<BinaryArchitecture>) {
         self.version = version
         self.appURL = appURL
+        self.architectures = architectures
     }
 }
 
@@ -14,6 +16,9 @@ public enum ChromeDetectionError: Error, LocalizedError {
     case unreadableInfoPlist(URL)
     case invalidInfoPlist(URL)
     case missingVersion(URL)
+    case missingExecutable(URL)
+    case unreadableExecutable(URL)
+    case invalidExecutable(URL)
 
     public var errorDescription: String? {
         switch self {
@@ -23,6 +28,12 @@ public enum ChromeDetectionError: Error, LocalizedError {
             return "Chrome app metadata is invalid at \(url.path)."
         case .missingVersion(let url):
             return "Chrome app metadata does not contain a version at \(url.path)."
+        case .missingExecutable(let url):
+            return "Chrome app metadata does not name an executable at \(url.path)."
+        case .unreadableExecutable(let url):
+            return "Could not read the Chrome executable at \(url.path)."
+        case .invalidExecutable(let url):
+            return "Chrome's executable has an invalid or unsupported Mach-O header at \(url.path)."
         }
     }
 }
@@ -69,7 +80,32 @@ public enum ChromeDetector {
                 throw ChromeDetectionError.missingVersion(infoURL)
             }
 
-            return ChromeInstallation(version: version, appURL: appURL)
+            guard let executableName = metadata["CFBundleExecutable"] as? String,
+                  !executableName.isEmpty,
+                  !executableName.contains("/") else {
+                throw ChromeDetectionError.missingExecutable(infoURL)
+            }
+
+            let executableURL = appURL
+                .appendingPathComponent("Contents/MacOS", isDirectory: true)
+                .appendingPathComponent(executableName, isDirectory: false)
+            let architectures: Set<BinaryArchitecture>
+            do {
+                architectures = try MachOArchitectures.read(from: executableURL)
+            } catch let error as MachOArchitectures.ReadError {
+                switch error {
+                case .unreadable:
+                    throw ChromeDetectionError.unreadableExecutable(executableURL)
+                case .invalid:
+                    throw ChromeDetectionError.invalidExecutable(executableURL)
+                }
+            }
+
+            return ChromeInstallation(
+                version: version,
+                appURL: appURL,
+                architectures: architectures
+            )
         }
 
         return nil
