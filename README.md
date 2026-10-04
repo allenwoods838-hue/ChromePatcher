@@ -57,6 +57,13 @@ To generate a JSON profile template without guessing the schema, print one from 
 swift run ChromePatcher --profile-template my-chrome-build
 ```
 
+If you want to create a starter profile file at the default location, initialize it once:
+
+```sh
+swift run ChromePatcher --init-profiles-file
+swift run ChromePatcher --init-profiles-file ~/Library/Application\ Support/ChromePatcher/custom-profiles.json
+```
+
 To validate an existing profile file before using it:
 
 ```sh
