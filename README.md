@@ -22,6 +22,12 @@ Build and run on macOS with Swift:
 swift run ChromePatcher --minimum-macos 12.0
 ```
 
+For scripts, add `--json` to emit a JSON report instead:
+
+```sh
+swift run ChromePatcher --minimum-macos 12.0 --json
+```
+
 Replace `12.0` with the minimum required by the Chrome build you intend to use.
 The checker searches the standard system and user Applications folders. It
 exits with status `0` when macOS meets the supplied minimum, `1` when it does
@@ -29,7 +35,8 @@ not, and `2` for invalid usage or unreadable Chrome metadata/executable. The
 exit status reflects the macOS minimum check only; architecture availability
 and the overall readiness summary are reported separately. If Chrome is not
 installed, the tool reports that readiness cannot be assessed. Use `--help`
-for command help.
+for command help. JSON output is written alone to standard output; diagnostics
+and errors go to standard error. Its schema is versioned with `schemaVersion`.
 
 This tool is diagnostic only. It does not download, install, modify, or launch
 Chrome, and it does not change system files. The Chrome version is reported for
