@@ -70,6 +70,20 @@ To validate an existing profile file before using it:
 swift run ChromePatcher --validate-profiles-file ~/Library/Application\ Support/ChromePatcher/profiles.json
 ```
 
+Manage profiles without manually editing JSON. Add rejects duplicate names,
+update and remove require an existing profile, and updates preserve a saved
+description unless a new one is supplied:
+
+```sh
+swift run ChromePatcher --add-profile chrome-beta --minimum-macos 12.0 --description "Chrome beta"
+swift run ChromePatcher --update-profile chrome-beta --minimum-macos 13.0
+swift run ChromePatcher --remove-profile chrome-beta
+```
+
+Use `--profiles-file PATH` with these commands to manage a custom profiles
+file. Updates are written atomically so a failed write does not leave a partial
+JSON file.
+
 Pass `--profiles-file PATH` with `--profile` or `--list-profiles` to use another
 configuration file. The original `--minimum-macos VERSION` command remains
 available for one-off checks.

@@ -22,6 +22,7 @@ public enum ChromeBuildProfileError: Error, LocalizedError {
     case unreadableFile(URL)
     case invalidFile(URL)
     case profileNotFound(String, URL)
+    case profileAlreadyExists(String, URL)
     case invalidMinimumVersion(String, String)
     case invalidProfileName
 
@@ -33,6 +34,8 @@ public enum ChromeBuildProfileError: Error, LocalizedError {
             return "Chrome build profiles are invalid at \(url.path). Expected a JSON object with a \"profiles\" object."
         case .profileNotFound(let name, let url):
             return "Chrome build profile '\(name)' was not found in \(url.path)."
+        case .profileAlreadyExists(let name, let url):
+            return "Chrome build profile '\(name)' already exists in \(url.path)."
         case .invalidMinimumVersion(let name, let value):
             return "Chrome build profile '\(name)' has invalid minimum macOS version '\(value)'."
         case .invalidProfileName:
@@ -59,7 +62,7 @@ public struct ChromeBuildProfiles {
         profileName: String = "my-chrome-build",
         minimumMacOS: String = "12.0",
         description: String? = "Example profile; verify this minimum for the exact build."
-    ) -> String {
+    ) throws -> String {
         let normalizedName = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
         let safeName = normalizedName.isEmpty ? "my-chrome-build" : normalizedName
         let encodedFile = ChromeBuildProfileFile(profiles: [
@@ -71,8 +74,8 @@ public struct ChromeBuildProfiles {
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try! encoder.encode(encodedFile)
-        return String(data: data, encoding: .utf8) ?? "{}"
+        let data = try encoder.encode(encodedFile)
+        return String(decoding: data, as: UTF8.self)
     }
 
     public static func writeTemplate(
@@ -87,7 +90,7 @@ public struct ChromeBuildProfiles {
             withIntermediateDirectories: true
         )
 
-        let template = templateJSON(
+        let template = try templateJSON(
             profileName: profileName,
             minimumMacOS: minimumMacOS,
             description: description
@@ -136,5 +139,63 @@ public struct ChromeBuildProfiles {
 
     public func profile(named name: String) -> ChromeBuildProfile? {
         file.profiles[name]
+    }
+
+    public func addProfile(named name: String, profile: ChromeBuildProfile) throws {
+        try validate(name: name, profile: profile)
+        guard file.profiles[name] == nil else {
+            throw ChromeBuildProfileError.profileAlreadyExists(name, fileURL)
+        }
+
+        var updatedProfiles = file.profiles
+        updatedProfiles[name] = profile
+        try write(ChromeBuildProfileFile(profiles: updatedProfiles))
+    }
+
+    public func updateProfile(
+        named name: String,
+        minimumMacOS: String,
+        description: String? = nil
+    ) throws {
+        guard let currentProfile = file.profiles[name] else {
+            throw ChromeBuildProfileError.profileNotFound(name, fileURL)
+        }
+
+        let updatedProfile = ChromeBuildProfile(
+            minimumMacOS: minimumMacOS,
+            description: description ?? currentProfile.description
+        )
+        try validate(name: name, profile: updatedProfile)
+
+        var updatedProfiles = file.profiles
+        updatedProfiles[name] = updatedProfile
+        try write(ChromeBuildProfileFile(profiles: updatedProfiles))
+    }
+
+    public func removeProfile(named name: String) throws {
+        guard file.profiles[name] != nil else {
+            throw ChromeBuildProfileError.profileNotFound(name, fileURL)
+        }
+
+        var updatedProfiles = file.profiles
+        updatedProfiles.removeValue(forKey: name)
+        try write(ChromeBuildProfileFile(profiles: updatedProfiles))
+    }
+
+    private func validate(name: String, profile: ChromeBuildProfile) throws {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              name == name.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            throw ChromeBuildProfileError.invalidProfileName
+        }
+        guard MacOSVersion(profile.minimumMacOS) != nil else {
+            throw ChromeBuildProfileError.invalidMinimumVersion(name, profile.minimumMacOS)
+        }
+    }
+
+    private func write(_ file: ChromeBuildProfileFile) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(file)
+        try data.write(to: fileURL, options: .atomic)
     }
 }

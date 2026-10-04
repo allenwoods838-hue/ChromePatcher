@@ -10,6 +10,9 @@ Usage:
   ChromePatcher --profile-template [NAME]
   ChromePatcher --validate-profiles-file PATH
   ChromePatcher --init-profiles-file [PATH]
+  ChromePatcher --add-profile NAME --minimum-macos VERSION [--description TEXT] [--profiles-file PATH]
+  ChromePatcher --update-profile NAME --minimum-macos VERSION [--description TEXT] [--profiles-file PATH]
+  ChromePatcher --remove-profile NAME [--profiles-file PATH]
 
 Detect Google Chrome and compare this Mac's macOS version with a Chrome build's minimum.
 VERSION must be numeric, for example 12.0 or 10.15.7.
@@ -18,6 +21,7 @@ Use --list-profiles to list configured profile names.
 Use --profile-template NAME to print a JSON template for a new profile.
 Use --validate-profiles-file PATH to validate a profiles JSON file.
 Use --init-profiles-file PATH to create a starter profiles file in the standard location.
+Use --add-profile, --update-profile, and --remove-profile to manage named profiles.
 Use --profiles-file PATH to select a profiles JSON file.
 Add --json to emit a machine-readable JSON report.
 Chrome is searched for in /Applications and ~/Applications.
@@ -101,7 +105,74 @@ case "--profile-template":
         fputs("Profile names must not be empty.\n\(usage)\n", stderr)
         exit(2)
     }
-    print(ChromeBuildProfiles.templateJSON(profileName: profileName))
+    do {
+        print(try ChromeBuildProfiles.templateJSON(profileName: profileName))
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(2)
+    }
+    exit(0)
+case "--add-profile":
+    guard (commandArguments.count == 4 || commandArguments.count == 6),
+          commandArguments[2] == "--minimum-macos",
+          let version = MacOSVersion(commandArguments[3]),
+          commandArguments.count == 4 || commandArguments[4] == "--description",
+          jsonArguments.isEmpty else {
+        fputs("Invalid profile name, minimum macOS version, or command options.\n\(usage)\n", stderr)
+        exit(2)
+    }
+    let name = commandArguments[1]
+    let description = commandArguments.count == 6 ? commandArguments[5] : nil
+    let profileURL = profilesFileURL ?? ChromeBuildProfiles.defaultFileURL
+    do {
+        try ChromeBuildProfiles.load(from: profileURL).addProfile(
+            named: name,
+            profile: ChromeBuildProfile(minimumMacOS: version.description, description: description)
+        )
+        print("Added Chrome build profile '\(name)'.")
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(2)
+    }
+    exit(0)
+case "--update-profile":
+    guard (commandArguments.count == 4 || commandArguments.count == 6),
+          commandArguments[2] == "--minimum-macos",
+          let version = MacOSVersion(commandArguments[3]),
+          commandArguments.count == 4 || commandArguments[4] == "--description",
+          jsonArguments.isEmpty else {
+        fputs("Invalid profile name, minimum macOS version, or command options.\n\(usage)\n", stderr)
+        exit(2)
+    }
+    let name = commandArguments[1]
+    let description = commandArguments.count == 6 ? commandArguments[5] : nil
+    let profileURL = profilesFileURL ?? ChromeBuildProfiles.defaultFileURL
+    do {
+        try ChromeBuildProfiles.load(from: profileURL).updateProfile(
+            named: name,
+            minimumMacOS: version.description,
+            description: description
+        )
+        print("Updated Chrome build profile '\(name)'.")
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(2)
+    }
+    exit(0)
+case "--remove-profile":
+    guard commandArguments.count == 2, jsonArguments.isEmpty else {
+        fputs("\(usage)\n", stderr)
+        exit(2)
+    }
+    let name = commandArguments[1]
+    let profileURL = profilesFileURL ?? ChromeBuildProfiles.defaultFileURL
+    do {
+        try ChromeBuildProfiles.load(from: profileURL).removeProfile(named: name)
+        print("Removed Chrome build profile '\(name)'.")
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(2)
+    }
     exit(0)
 case "--validate-profiles-file":
     guard commandArguments.count == 2, jsonArguments.isEmpty else {
