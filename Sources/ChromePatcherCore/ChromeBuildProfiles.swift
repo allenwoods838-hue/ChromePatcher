@@ -66,6 +66,7 @@ public enum ChromeBuildProfileError: Error, LocalizedError {
     case invalidFile(URL)
     case profileNotFound(String, URL)
     case profileAlreadyExists(String, URL)
+    case destinationAlreadyExists(URL)
     case invalidMinimumVersion(String, String)
     case invalidProfileName
 
@@ -79,6 +80,8 @@ public enum ChromeBuildProfileError: Error, LocalizedError {
             return "Chrome build profile '\(name)' was not found in \(url.path)."
         case .profileAlreadyExists(let name, let url):
             return "Chrome build profile '\(name)' already exists in \(url.path)."
+        case .destinationAlreadyExists(let url):
+            return "Cannot export profiles because the destination already exists at \(url.path)."
         case .invalidMinimumVersion(let name, let value):
             return "Chrome build profile '\(name)' has invalid minimum macOS version '\(value)'."
         case .invalidProfileName:
@@ -225,6 +228,40 @@ public struct ChromeBuildProfiles {
         try write(ChromeBuildProfileFile(profiles: updatedProfiles))
     }
 
+    public func export(to destinationURL: URL) throws {
+        let directoryURL = destinationURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true
+        )
+        let data = try encodedFile()
+        let temporaryURL = directoryURL.appendingPathComponent(".\(UUID().uuidString).profiles")
+        try data.write(to: temporaryURL, options: .atomic)
+        do {
+            try FileManager.default.moveItem(at: temporaryURL, to: destinationURL)
+        } catch {
+            try? FileManager.default.removeItem(at: temporaryURL)
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                throw ChromeBuildProfileError.destinationAlreadyExists(destinationURL)
+            }
+            throw error
+        }
+    }
+
+    public func importProfiles(from source: ChromeBuildProfiles) throws {
+        for name in source.names where file.profiles[name] != nil {
+            throw ChromeBuildProfileError.profileAlreadyExists(name, fileURL)
+        }
+
+        var updatedProfiles = file.profiles
+        for name in source.names {
+            if let profile = source.profile(named: name) {
+                updatedProfiles[name] = profile
+            }
+        }
+        try write(ChromeBuildProfileFile(profiles: updatedProfiles))
+    }
+
     private func validate(name: String, profile: ChromeBuildProfile) throws {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               name == name.trimmingCharacters(in: .whitespacesAndNewlines) else {
@@ -236,9 +273,13 @@ public struct ChromeBuildProfiles {
     }
 
     private func write(_ file: ChromeBuildProfileFile) throws {
+        let data = try encodedFile(file)
+        try data.write(to: fileURL, options: .atomic)
+    }
+
+    private func encodedFile(_ file: ChromeBuildProfileFile? = nil) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(file)
-        try data.write(to: fileURL, options: .atomic)
+        return try encoder.encode(file ?? self.file)
     }
 }
