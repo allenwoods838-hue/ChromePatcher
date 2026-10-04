@@ -9,6 +9,7 @@ Usage:
   ChromePatcher --list-profiles [--profiles-file PATH]
   ChromePatcher --profile-template [NAME]
   ChromePatcher --validate-profiles-file PATH
+  ChromePatcher --init-profiles-file [PATH]
 
 Detect Google Chrome and compare this Mac's macOS version with a Chrome build's minimum.
 VERSION must be numeric, for example 12.0 or 10.15.7.
@@ -16,6 +17,7 @@ Use --profile NAME to check a named local build profile.
 Use --list-profiles to list configured profile names.
 Use --profile-template NAME to print a JSON template for a new profile.
 Use --validate-profiles-file PATH to validate a profiles JSON file.
+Use --init-profiles-file PATH to create a starter profiles file in the standard location.
 Use --profiles-file PATH to select a profiles JSON file.
 Add --json to emit a machine-readable JSON report.
 Chrome is searched for in /Applications and ~/Applications.
@@ -110,6 +112,24 @@ case "--validate-profiles-file":
     do {
         _ = try ChromeBuildProfiles.load(from: profileURL)
         print("Valid Chrome build profiles file: \(profileURL.path)")
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(2)
+    }
+    exit(0)
+case "--init-profiles-file":
+    guard commandArguments.count <= 2, jsonArguments.isEmpty else {
+        fputs("\(usage)\n", stderr)
+        exit(2)
+    }
+    let profileURL = commandArguments.count == 2 ? URL(fileURLWithPath: commandArguments[1]) : ChromeBuildProfiles.defaultFileURL
+    if FileManager.default.fileExists(atPath: profileURL.path) {
+        fputs("Profile file already exists at \(profileURL.path).\n", stderr)
+        exit(2)
+    }
+    do {
+        try ChromeBuildProfiles.writeTemplate(to: profileURL)
+        print("Created profile file: \(profileURL.path)")
     } catch {
         fputs("\(error.localizedDescription)\n", stderr)
         exit(2)

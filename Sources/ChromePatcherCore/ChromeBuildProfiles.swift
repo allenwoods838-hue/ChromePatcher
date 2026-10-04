@@ -75,6 +75,26 @@ public struct ChromeBuildProfiles {
         return String(data: data, encoding: .utf8) ?? "{}"
     }
 
+    public static func writeTemplate(
+        to fileURL: URL,
+        profileName: String = "my-chrome-build",
+        minimumMacOS: String = "12.0",
+        description: String? = "Example profile; verify this minimum for the exact build."
+    ) throws {
+        let directoryURL = fileURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true
+        )
+
+        let template = templateJSON(
+            profileName: profileName,
+            minimumMacOS: minimumMacOS,
+            description: description
+        )
+        try template.write(to: fileURL, atomically: true, encoding: .utf8)
+    }
+
     public static func load(from fileURL: URL) throws -> ChromeBuildProfiles {
         let data: Data
         do {

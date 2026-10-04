@@ -63,6 +63,18 @@ final class ChromeBuildProfilesTests: XCTestCase {
         XCTAssertEqual(decoded.profiles["chrome-126"]?.description, "Example profile")
     }
 
+    func testWritesTemplateFileToDisk() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        try ChromeBuildProfiles.writeTemplate(to: url, profileName: "chrome-126")
+        let profiles = try ChromeBuildProfiles.load(from: url)
+
+        XCTAssertEqual(profiles.names, ["chrome-126"])
+        XCTAssertEqual(try profiles.minimumMacOSVersion(for: "chrome-126"), MacOSVersion(major: 12, minor: 0))
+    }
+
     private func writeProfiles(_ profiles: [String: ChromeBuildProfile]) throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
