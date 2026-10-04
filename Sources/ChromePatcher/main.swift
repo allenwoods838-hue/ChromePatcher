@@ -7,6 +7,8 @@ Usage:
   ChromePatcher --minimum-macos VERSION [--json]
   ChromePatcher --profile NAME [--profiles-file PATH] [--json]
   ChromePatcher --list-profiles [--profiles-file PATH]
+  ChromePatcher --show-profile NAME [--profiles-file PATH] [--json]
+  ChromePatcher --compare-profiles NAME1 NAME2 [--profiles-file PATH] [--json]
   ChromePatcher --profile-template [NAME]
   ChromePatcher --validate-profiles-file PATH
   ChromePatcher --init-profiles-file [PATH]
@@ -18,6 +20,8 @@ Detect Google Chrome and compare this Mac's macOS version with a Chrome build's 
 VERSION must be numeric, for example 12.0 or 10.15.7.
 Use --profile NAME to check a named local build profile.
 Use --list-profiles to list configured profile names.
+Use --show-profile NAME to inspect a profile without changing it.
+Use --compare-profiles NAME1 NAME2 to compare profile requirements.
 Use --profile-template NAME to print a JSON template for a new profile.
 Use --validate-profiles-file PATH to validate a profiles JSON file.
 Use --init-profiles-file PATH to create a starter profiles file in the standard location.
@@ -29,6 +33,14 @@ The Chrome executable's CPU architectures are checked against this Mac.
 Default profiles file: ~/Library/Application Support/ChromePatcher/profiles.json
 This checker is read-only; it does not modify macOS or Chrome.
 """
+
+private func printJSON<T: Encodable>(_ value: T) throws {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    var output = try encoder.encode(value)
+    output.append(0x0a)
+    FileHandle.standardOutput.write(output)
+}
 
 let arguments = Array(CommandLine.arguments.dropFirst())
 
@@ -89,6 +101,72 @@ case "--list-profiles":
                 let description = profile.description.map { " - \($0)" } ?? ""
                 print("\(name): macOS \(profile.minimumMacOS)\(description)")
             }
+        }
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(2)
+    }
+    exit(0)
+case "--show-profile":
+    guard commandArguments.count == 2 else {
+        fputs("\(usage)\n", stderr)
+        exit(2)
+    }
+    let profileURL = profilesFileURL ?? ChromeBuildProfiles.defaultFileURL
+    do {
+        let profiles = try ChromeBuildProfiles.load(from: profileURL)
+        let name = commandArguments[1]
+        guard let profile = profiles.profile(named: name) else {
+            throw ChromeBuildProfileError.profileNotFound(name, profileURL)
+        }
+        let summary = ChromeBuildProfileSummary(name: name, profile: profile)
+        if jsonArguments.isEmpty {
+            print("Profile: \(summary.name)")
+            print("Minimum macOS: \(summary.minimumMacOS)")
+            if let description = summary.description {
+                print("Description: \(description)")
+            }
+        } else {
+            try printJSON(summary)
+        }
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(2)
+    }
+    exit(0)
+case "--compare-profiles":
+    guard commandArguments.count == 3 else {
+        fputs("\(usage)\n", stderr)
+        exit(2)
+    }
+    let profileURL = profilesFileURL ?? ChromeBuildProfiles.defaultFileURL
+    do {
+        let profiles = try ChromeBuildProfiles.load(from: profileURL)
+        let firstName = commandArguments[1]
+        let secondName = commandArguments[2]
+        guard let firstProfile = profiles.profile(named: firstName) else {
+            throw ChromeBuildProfileError.profileNotFound(firstName, profileURL)
+        }
+        guard let secondProfile = profiles.profile(named: secondName) else {
+            throw ChromeBuildProfileError.profileNotFound(secondName, profileURL)
+        }
+        let comparison = try ChromeBuildProfileComparison(
+            first: ChromeBuildProfileSummary(name: firstName, profile: firstProfile),
+            second: ChromeBuildProfileSummary(name: secondName, profile: secondProfile)
+        )
+        if jsonArguments.isEmpty {
+            print("\(comparison.first.name): macOS \(comparison.first.minimumMacOS)")
+            print("\(comparison.second.name): macOS \(comparison.second.minimumMacOS)")
+            switch comparison.minimumVersionRelation {
+            case .same:
+                print("Minimum macOS requirements are the same.")
+            case .firstRequiresNewer:
+                print("\(comparison.first.name) requires a newer macOS version.")
+            case .secondRequiresNewer:
+                print("\(comparison.second.name) requires a newer macOS version.")
+            }
+        } else {
+            try printJSON(comparison)
         }
     } catch {
         fputs("\(error.localizedDescription)\n", stderr)
