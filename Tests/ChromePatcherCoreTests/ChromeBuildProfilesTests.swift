@@ -116,6 +116,38 @@ final class ChromeBuildProfilesTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: url), originalData)
     }
 
+    func testProfileComparisonReportsWhichMinimumIsNewer() throws {
+        let first = ChromeBuildProfileSummary(
+            name: "older-build",
+            profile: ChromeBuildProfile(minimumMacOS: "12.0", description: "Monterey")
+        )
+        let second = ChromeBuildProfileSummary(
+            name: "newer-build",
+            profile: ChromeBuildProfile(minimumMacOS: "13.0")
+        )
+
+        let comparison = try ChromeBuildProfileComparison(first: first, second: second)
+
+        XCTAssertEqual(comparison.minimumVersionRelation, .secondRequiresNewer)
+        XCTAssertEqual(comparison.first.description, "Monterey")
+    }
+
+    func testProfileComparisonTreatsEquivalentVersionFormatsAsSame() throws {
+        let first = ChromeBuildProfileSummary(
+            name: "build-one",
+            profile: ChromeBuildProfile(minimumMacOS: "12.0")
+        )
+        let second = ChromeBuildProfileSummary(
+            name: "build-two",
+            profile: ChromeBuildProfile(minimumMacOS: "12.0.0")
+        )
+
+        XCTAssertEqual(
+            try ChromeBuildProfileComparison(first: first, second: second).minimumVersionRelation,
+            .same
+        )
+    }
+
     private func writeProfiles(_ profiles: [String: ChromeBuildProfile]) throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)

@@ -49,7 +49,16 @@ profile. Then list and use profiles by name:
 swift run ChromePatcher --list-profiles
 swift run ChromePatcher --profile my-chrome-build
 swift run ChromePatcher --profile my-chrome-build --json
+swift run ChromePatcher --show-profile my-chrome-build
+swift run ChromePatcher --compare-profiles chrome-126 my-chrome-build
 ```
+
+`--show-profile` displays a profile's minimum macOS version and optional
+description. `--compare-profiles` shows both minimums and indicates which
+profile requires a newer macOS version, or whether they are equivalent.
+Add `--json` to either command for structured output; the comparison JSON
+includes `minimumVersionRelation` (`same`, `firstRequiresNewer`, or
+`secondRequiresNewer`). Both commands accept `--profiles-file PATH`.
 
 To generate a JSON profile template without guessing the schema, print one from the CLI:
 

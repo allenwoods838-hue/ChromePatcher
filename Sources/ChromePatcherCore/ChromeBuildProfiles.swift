@@ -18,6 +18,49 @@ public struct ChromeBuildProfileFile: Codable, Equatable {
     }
 }
 
+public struct ChromeBuildProfileSummary: Codable, Equatable {
+    public let name: String
+    public let minimumMacOS: String
+    public let description: String?
+
+    public init(name: String, profile: ChromeBuildProfile) {
+        self.name = name
+        self.minimumMacOS = profile.minimumMacOS
+        self.description = profile.description
+    }
+}
+
+public struct ChromeBuildProfileComparison: Codable, Equatable {
+    public enum MinimumVersionRelation: String, Codable {
+        case same
+        case firstRequiresNewer
+        case secondRequiresNewer
+    }
+
+    public let first: ChromeBuildProfileSummary
+    public let second: ChromeBuildProfileSummary
+    public let minimumVersionRelation: MinimumVersionRelation
+
+    public init(first: ChromeBuildProfileSummary, second: ChromeBuildProfileSummary) throws {
+        self.first = first
+        self.second = second
+
+        guard let firstMinimum = MacOSVersion(first.minimumMacOS) else {
+            throw ChromeBuildProfileError.invalidMinimumVersion(first.name, first.minimumMacOS)
+        }
+        guard let secondMinimum = MacOSVersion(second.minimumMacOS) else {
+            throw ChromeBuildProfileError.invalidMinimumVersion(second.name, second.minimumMacOS)
+        }
+        if firstMinimum == secondMinimum {
+            minimumVersionRelation = .same
+        } else if firstMinimum > secondMinimum {
+            minimumVersionRelation = .firstRequiresNewer
+        } else {
+            minimumVersionRelation = .secondRequiresNewer
+        }
+    }
+}
+
 public enum ChromeBuildProfileError: Error, LocalizedError {
     case unreadableFile(URL)
     case invalidFile(URL)
